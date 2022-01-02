@@ -115,7 +115,7 @@ namespace elweebo
                                         else
                                         {
                                             output += fulldiv;
-                                            //if (spaceafter) output += " ";
+                                            if (spaceafter) output += " ";
                                         }
                                     }
                                     
