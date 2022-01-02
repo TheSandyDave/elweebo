@@ -80,44 +80,71 @@ namespace elweebo
                         {
                             using (var writeStream = new StreamWriter(modifiedStream))
                             {
-
+                              
                                 while (readStream.Peek() >= 0)
                                 {
                                     var ch = readStream.ReadLine();
                                     string output = "";
-                                    var divs = await converter.GetDivisions(ch);
-                                    //divides text into proper japanese reading segments, does whatever with non japanese text
-                                    //breaks spacing if non japanese is there, which means it breaks spacing on html and needs fixing which i am hacking around cause lazy
-                                    foreach (var div in divs)
-                                    {
-                                        string fulldiv = "";
-                                        foreach (var idiom in div)
+                                    List<string> strings = new List<string>();
+                                    // magic to not add furigana on top of furigana
+                                    int index = 0;
+                                    while (index != -1) {
+                                        index = ch.IndexOf("<ruby>");
+                                        if (index != -1) {
+                                            strings.Add(ch.Substring(0, index));
+                                            ch = ch.Remove(0, index);
+                                            var fIndex = ch.IndexOf("</ruby>");
+                                            var htmlSegment = ch.Substring(0, fIndex + 7);
+                                            strings.Add(htmlSegment);
+                                            ch = ch.Remove(0, fIndex + 7);
+                                        } else
                                         {
-                                            fulldiv += idiom.Element;
-                                        }
-                                        //ugly spacing hack fix, but this whole thing is ugly hackery so meh
-                                        var spaceafter = ch.Contains(fulldiv + " ");
-                                        bool iskanji = false;
-                                        // IsKanji check fails if there is a single non kanji character, breaking words like 目指す
-                                        // check if a any characters in an idiom are a kanji so we we can resolve the furigana 
-                                        foreach (char chr in fulldiv)
-                                        {
-                                            if (WanaKana.IsKanji(chr.ToString()))
-                                            {
-                                                iskanji = true;
-                                                break;
-                                            }
-                                        }
-                                        if (iskanji)
-                                        {
-                                            output += await converter.Convert(fulldiv, To.Hiragana, Mode.Furigana);
-                                        }
-                                        else
-                                        {
-                                            output += fulldiv;
-                                            if (spaceafter) output += " ";
+                                            strings.Add(ch);
                                         }
                                     }
+                                    //divides text into proper japanese reading segments, does whatever with non japanese text
+                                    //breaks spacing if non japanese is there, which means it breaks spacing on html and needs fixing which i am hacking around cause lazy
+                                    foreach(var segment in strings)
+                                    {
+                                        if (segment.StartsWith("<ruby>"))
+                                        {
+                                            output += segment;
+                                            continue;
+                                        }
+            
+                                        var divs = await converter.GetDivisions(segment);
+                                        foreach (var div in divs)
+                                        {
+                                            string fulldiv = "";
+                                            foreach (var idiom in div)
+                                            {
+                                                fulldiv += idiom.Element;
+                                            }
+                                            //ugly spacing hack fix, but this whole thing is ugly hackery so meh
+                                            var spaceafter = ch.Contains(fulldiv + " ");
+                                            bool iskanji = false;
+                                            // IsKanji check fails if there is a single non kanji character, breaking words like 目指す
+                                            // check if a any characters in an idiom are a kanji so we we can resolve the furigana 
+                                            foreach (char chr in fulldiv)
+                                            {
+                                                if (WanaKana.IsKanji(chr.ToString()))
+                                                {
+                                                    iskanji = true;
+                                                    break;
+                                                }
+                                            }
+                                            if (iskanji)
+                                            {
+                                                output += await converter.Convert(fulldiv, To.Hiragana, Mode.Furigana);
+                                            }
+                                            else
+                                            {
+                                                output += fulldiv;
+                                                if (spaceafter) output += " ";
+                                            }
+                                        }
+                                    }
+
                                     
                                     writeStream.WriteLine(output);
                                 }
